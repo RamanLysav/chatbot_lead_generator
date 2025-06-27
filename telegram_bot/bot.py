@@ -9,9 +9,9 @@ from telegram.ext import (
     filters,
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
-WEBHOOK_URL = os.getenv("WEBHOOK_URL") or "https://chatbot-lead-generator.onrender.com"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 user_data = {}
 
@@ -60,10 +60,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❌ Нет", callback_data="nav_no")],
             [InlineKeyboardButton("❓ Не знаю", callback_data="nav_unknown")]
         ]
-        await update.message.reply_text(
-            "Есть ли в мультимедии автомобиля встроенная навигация?",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await update.message.reply_text("Есть ли в мультимедии автомобиля встроенная навигация?", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif step == "phone":
         if len(text) < 6:
@@ -94,9 +91,7 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     session["nav"] = nav_choice
     session["step"] = "phone"
-    await query.edit_message_text(
-        "✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n\nПожалуйста, введите номер телефона:"
-    )
+    await query.edit_message_text("✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n\nПожалуйста, введите номер телефона:")
 
 async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
