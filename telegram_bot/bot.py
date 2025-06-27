@@ -9,7 +9,6 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-from datetime import datetime
 
 # Конфигурация
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
@@ -48,18 +47,20 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text("✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n Если хотите оставить заявку\nВведите номер телефона с кодом оператора:")
 
 # Финальный шаг
+from datetime import datetime
+
 async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    user = query.from_user
-    first_name = user.first_name or "—"
-    username = f"@{user.username}" if user.username else "—"
-    user_id = user.id
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+    user = query.from_user
     session = user_data.get(user_id)
 
     if session:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        first_name = user.first_name or "—"
+        username = f"@{user.username}" if user.username else "—"
+
         msg = (
             f"📬 Заявка от пользователя:\n"
             f"• Имя: {first_name}\n"
@@ -77,7 +78,6 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data.pop(user_id, None)
     else:
         await query.edit_message_text("⛔ Данные не найдены. Начните с /start.")
-
 # Обработка текста по шагам
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
