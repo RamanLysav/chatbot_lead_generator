@@ -9,6 +9,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from datetime import datetime
 
 # Конфигурация
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
@@ -21,8 +22,9 @@ user_data = {}
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Посчитать стоимость", callback_data="start_calc")]]
     await update.message.reply_text(
-        "⚠️ Добро пожаловать в сервис перепрошивки мультимедийных систем FORD.\n\n"
-        "Ответьте на несколько вопросов, и вы увидите стоимость услуги и сможете оставить заявку.",
+        "⚠️ Добро пожаловать в сервис перепрошивки мультимедийных систем FORD.\n\n" \
+        "мы работаем только в городе Минск\n\n"
+        "Чтобы увидеть стоимость услуги, ответьте на несколько вопросов, после чего Вы сможете оставить заявку.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -43,10 +45,15 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = user_data.get(user_id, {})
     session["nav"] = nav
     session["step"] = "phone"
-    await query.edit_message_text("✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n\nВведите номер телефона:")
+    await query.edit_message_text("✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n Если хотите оставить заявку\nВведите номер телефона с кодом оператора:")
 
 # Финальный шаг
 async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    user = query.from_user
+    first_name = user.first_name or "—"
+    username = f"@{user.username}" if user.username else "—"
+    user_id = user.id
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -55,13 +62,18 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if session:
         msg = (
             f"📬 Заявка от пользователя:\n"
+            f"• Имя: {first_name}\n"
+            f"• Username: {username}\n"
+            f"• Telegram ID: {user_id}\n"
+            f"• Время заявки: {timestamp}\n\n"
             f"• Год: {session['year']}\n"
             f"• Модель: {session['model']}\n"
             f"• Навигация: {session['nav']}\n"
             f"• Телефон: {session['phone']}"
         )
+
         await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
-        await query.edit_message_text("✅ Спасибо! Мы свяжемся с вами в ближайшее время.")
+        await query.edit_message_text("✅ Спасибо! Ваша заявка принята! Мы свяжемся с вами в ближайшее время.")
         user_data.pop(user_id, None)
     else:
         await query.edit_message_text("⛔ Данные не найдены. Начните с /start.")
@@ -104,7 +116,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⛔ Введите корректный номер телефона.")
             return
         session["phone"] = text
-        keyboard = [[InlineKeyboardButton("📞 Связаться со мной", callback_data="notify_me")]]
+        keyboard = [[InlineKeyboardButton("📞Отправить заявку", callback_data="notify_me")]]
         msg = (
             f"📥 Новая заявка:\n"
             f"• Год: {session['year']}\n"
