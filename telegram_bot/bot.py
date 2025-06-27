@@ -129,7 +129,9 @@ async def main():
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", "8080")),
         url_path="/webhook",
+        webhook_url=f"{WEBHOOK_URL}/webhook"  # ← вот это было важно!
     )
+
     await app.updater.idle()
 
 if __name__ == "__main__":
