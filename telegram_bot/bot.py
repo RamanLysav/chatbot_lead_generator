@@ -125,7 +125,6 @@ async def main():
 
     await app.initialize()
     await app.start()
-    await app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
     await app.updater.start_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", "8080")),
