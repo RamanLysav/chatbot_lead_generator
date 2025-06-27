@@ -1,4 +1,5 @@
 import os
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -9,21 +10,23 @@ from telegram.ext import (
     filters,
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
-#WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+# Конфигурация
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
 WEBHOOK_URL = "https://chatbot-lead-generator.onrender.com"
 
 user_data = {}
 
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Посчитать стоимость", callback_data="start_calc")]]
     await update.message.reply_text(
-        "⚠️ Добро пожаловать в сервис руссификации и перепрошивки мультимедийных систем FORD.\n\n"
-        "Ответьте на несколько вопросов — и получите стоимость услуги и возможность оставить заявку.",
+        "⚠️ Добро пожаловать в сервис перепрошивки мультимедийных систем FORD.\n\n"
+        "Ответьте на несколько вопросов, и вы увидите стоимость услуги и сможете оставить заявку.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+# Старт опроса
 async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -31,16 +34,49 @@ async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data[user_id] = {"step": "year"}
     await query.edit_message_text("Введите год выпуска автомобиля (например, 2019):")
 
+# Обработка навигации
+async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    nav = query.data.replace("nav_", "")
+    session = user_data.get(user_id, {})
+    session["nav"] = nav
+    session["step"] = "phone"
+    await query.edit_message_text("✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n\nВведите номер телефона:")
+
+# Финальный шаг
+async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    session = user_data.get(user_id)
+
+    if session:
+        msg = (
+            f"📬 Заявка от пользователя:\n"
+            f"• Год: {session['year']}\n"
+            f"• Модель: {session['model']}\n"
+            f"• Навигация: {session['nav']}\n"
+            f"• Телефон: {session['phone']}"
+        )
+        await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
+        await query.edit_message_text("✅ Спасибо! Мы свяжемся с вами в ближайшее время.")
+        user_data.pop(user_id, None)
+    else:
+        await query.edit_message_text("⛔ Данные не найдены. Начните с /start.")
+
+# Обработка текста по шагам
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
     session = user_data.get(user_id)
 
-    if not session or "step" not in session:
-        await update.message.reply_text("Пожалуйста, начните сначала с команды /start.")
+    if not session:
+        await update.message.reply_text("Пожалуйста, начните с команды /start.")
         return
 
-    step = session["step"]
+    step = session.get("step")
 
     if step == "year":
         if not text.isdigit() or not (2000 <= int(text) <= 2025):
@@ -61,13 +97,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❌ Нет", callback_data="nav_no")],
             [InlineKeyboardButton("❓ Не знаю", callback_data="nav_unknown")]
         ]
-        await update.message.reply_text("Есть ли в мультимедии автомобиля встроенная навигация?", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text("Есть ли встроенная навигация?", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif step == "phone":
         if len(text) < 6:
             await update.message.reply_text("⛔ Введите корректный номер телефона.")
             return
         session["phone"] = text
+        keyboard = [[InlineKeyboardButton("📞 Связаться со мной", callback_data="notify_me")]]
         msg = (
             f"📥 Новая заявка:\n"
             f"• Год: {session['year']}\n"
@@ -76,44 +113,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"• Цена: 100.00 BYN\n"
             f"• Телефон: {session['phone']}"
         )
-        keyboard = [[InlineKeyboardButton("📞 Связаться со мной", callback_data="notify_me")]]
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
-async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    nav_choice = query.data.replace("nav_", "")
-    session = user_data.get(user_id)
-
-    if not session:
-        await query.edit_message_text("⛔ Сессия устарела. Начните с /start.")
-        return
-
-    session["nav"] = nav_choice
-    session["step"] = "phone"
-    await query.edit_message_text("✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n\nПожалуйста, введите номер телефона:")
-
-async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    session = user_data.get(user_id)
-
-    if session:
-        msg = (
-            f"📬 Заявка от пользователя:\n"
-            f"• Год: {session['year']}\n"
-            f"• Модель: {session['model']}\n"
-            f"• Навигация: {session['nav']}\n"
-            f"• Телефон: {session['phone']}"
-        )
-        await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
-        await query.edit_message_text("✅ Спасибо! Мы свяжемся с вами в ближайшее время.")
-        user_data.pop(user_id, None)
-    else:
-        await query.edit_message_text("⛔ Данных не найдено. Попробуйте снова с /start.")
-
+# Основной запуск
 async def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -129,11 +131,9 @@ async def main():
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", "8080")),
         url_path="/webhook",
-        webhook_url=f"{WEBHOOK_URL}/webhook"  # ← вот это было важно!
+        webhook_url=f"{WEBHOOK_URL}/webhook"
     )
-
-    await app.updater.idle()
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
