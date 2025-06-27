@@ -5,92 +5,124 @@ from telegram.ext import (
     CallbackQueryHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 import os
 
 user_data = {}
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)  # ← Замени на свой Telegram user ID
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)  # замените на свой ID
 
+# Старт: кнопка для запуска
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("Посчитать стоимость", callback_data="calculate")]]
+    keyboard = [[InlineKeyboardButton("Посчитать стоимость", callback_data="start_calc")]]
     await update.message.reply_text(
-        "⚠️ Добро пожаловать в сервис подсчета руссификации и перепрошивки мультимедийных систем автомобилей FORD. "
-        "Пожалуйста, ответьте на пару вопросов, затем вы увидите стоимость услуги и сможете записаться на перепрошивку. "
-        "Внимание: ваши ответы будут сохранены для отправки заявки.",
+        "⚠️ Добро пожаловать в сервис руссификации и перепрошивки мультимедийных систем FORD.\n\n"
+        "Ответьте на несколько вопросов — и получите стоимость услуги и возможность оставить заявку.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+# Шаг 1: ввод года
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    data = query.data
 
-    if user_id not in user_data:
-        user_data[user_id] = {}
+    user_data[user_id] = {}
+    await query.edit_message_text("Введите год выпуска автомобиля (например, 2019):")
 
-    if data == "calculate":
-        await query.edit_message_text("Введите год выпуска автомобиля (например, 2018):")
-
+# Шаг 2: ввод модели авто
 async def handle_year(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    year = update.message.text.strip()
+    text = update.message.text.strip()
 
-    if not year.isdigit() or not (1999 <= int(year) <= 2025):
-        await update.message.reply_text("Пожалуйста, введите корректный год, например: 2021")
+    if not text.isdigit() or not (2000 <= int(text) <= 2025):
+        await update.message.reply_text("Пожалуйста, введите корректный год от 2000 до 2025.")
         return
 
-    user_data[user_id] = {"year": year, "choice2": []}
+    user_data[user_id] = {"year": text}
+    await update.message.reply_text("Отлично! Теперь укажите модель автомобиля (например, Focus, Kuga, Explorer, и т.д.):")
+0
+# Шаг 3: выбор навигации
+async def handle_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    model = update.message.text.strip()
+
+    if not model or len(model) < 2:
+        await update.message.reply_text("Пожалуйста, введите корректное название модели.")
+        return
+
+    user_data[user_id]["model"] = model
 
     keyboard = [
-        [InlineKeyboardButton("А", callback_data="step2_A")],
-        [InlineKeyboardButton("Б", callback_data="step2_B")],
-        [InlineKeyboardButton("В", callback_data="step2_V")],
-        [InlineKeyboardButton("✅ Готово", callback_data="finish")]
+        [InlineKeyboardButton("✅ Есть", callback_data="nav_yes")],
+        [InlineKeyboardButton("❌ Нет", callback_data="nav_no")],
+        [InlineKeyboardButton("❓ Не знаю", callback_data="nav_unknown")]
     ]
     await update.message.reply_text(
-        f"✅ Год: {year}\nТеперь выберите один или несколько пунктов:",
+        "Есть ли в мультимедии автомобиля встроенная навигация?",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def handle_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Шаг 4: стоимость и ввод телефона
+async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    data = query.data
+    nav = query.data.replace("nav_", "")
+    user_data[user_id]["nav"] = nav
 
-    if user_id not in user_data or "year" not in user_data[user_id]:
-        await query.edit_message_text("Ошибка: начните сначала с команды /start")
+    await query.edit_message_text(
+        f"✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n\nПожалуйста, укажите ваш номер телефона для связи:"
+    )
+
+# Шаг 5: номер телефона и отправка заявки
+async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    phone = update.message.text.strip()
+
+    if not phone or len(phone) < 6:
+        await update.message.reply_text("Пожалуйста, введите корректный номер телефона.")
         return
 
-    if data.startswith("step2_"):
-        option = data.split("_")[1]
-        if option not in user_data[user_id]["choice2"]:
-            user_data[user_id]["choice2"].append(option)
-            await query.answer(f"Добавлено: {option}", show_alert=True)
+    user_data[user_id]["phone"] = phone
+    summary = user_data[user_id]
 
-    elif data == "finish":
-        summary = user_data[user_id]
-        price = "100₽"
+    msg = (
+        f"📥 Новая заявка:\n"
+        f"• Год: {summary['year']}\n"
+        f"• Модель: {summary['model']}\n"
+        f"• Навигация: {summary['nav']}\n"
+        f"• Цена: 100₽\n"
+        f"• Телефон: {summary['phone']}"
+    )
 
-        msg = (
-            f"📝 Новая заявка:\n"
-            f"• Год авто: {summary['year']}\n"
-            f"• Выбор(ы): {', '.join(summary['choice2']) if summary['choice2'] else '—'}\n"
-            f"• Цена: {price}"
-        )
+    keyboard = [[InlineKeyboardButton("📞 Связаться со мной", callback_data="notify_me")]]
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
-        await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
-        await query.edit_message_text(f"{msg}\n\nСпасибо за выбор!")
-        del user_data[user_id]
+# Подтверждение заявки
+async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    summary = user_data.get(user_id, {})
 
+    if summary:
+        await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"📬 Заявка от пользователя:\n\n{summary}")
+        await query.edit_message_text("✅ Спасибо! Мы все перепроверим и свяжемся с вами в ближайшее время.")
+        user_data.pop(user_id, None)
+    else:
+        await query.edit_message_text("⛔ Данных нет. Начните сначала с /start.")
+
+# Регистрация хендлеров
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(handle_callback, pattern="^calculate$"))
-    app.add_handler(CallbackQueryHandler(handle_options, pattern="^(step2_|finish)"))
+    app.add_handler(CallbackQueryHandler(handle_callback, pattern="^start_calc$"))
+    app.add_handler(CallbackQueryHandler(handle_navigation, pattern="^nav_"))
+    app.add_handler(CallbackQueryHandler(handle_notify, pattern="^notify_me$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_year))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_model))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone))
     app.run_polling()
