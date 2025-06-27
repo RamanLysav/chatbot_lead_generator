@@ -113,11 +113,17 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("✅ Спасибо! Мы все перепроверим и свяжемся с вами в ближайшее время.")
         user_data.pop(user_id, None)
     else:
-        await query.edit_message_text("⛔ Данных нет. Начните сначала с /start.")
+        await query.edit_message_text("⛔ Данных нет. Начните сначала с /start.")    
+# Вместо этого:
+# app.run_polling()
 
-# Регистрация хендлеров
+# Делаем так:
+WEBHOOK_URL = os.getenv("WEBHOOK_URL") or "https://your-app-name.onrender.com"
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # хендлеры...
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_callback, pattern="^start_calc$"))
     app.add_handler(CallbackQueryHandler(handle_navigation, pattern="^nav_"))
@@ -125,4 +131,10 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_year))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_model))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone))
-    app.run_polling()
+
+    # Webhook вместо polling
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.getenv("PORT", "8080")),
+        webhook_url=f"{WEBHOOK_URL}/webhook"
+    )
