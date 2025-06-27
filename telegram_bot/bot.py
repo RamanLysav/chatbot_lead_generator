@@ -11,7 +11,7 @@ from telegram.ext import (
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
-WEBHOOK_URL = os.getenv("WEBHOOK_URL") or "https://your-app-name.onrender.com"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL") or "https://chatbot-lead-generator.onrender.com"
 
 user_data = {}
 
