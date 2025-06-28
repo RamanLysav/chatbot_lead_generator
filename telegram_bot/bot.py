@@ -1,5 +1,6 @@
 import os
 import asyncio
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -19,11 +20,11 @@ user_data = {}
 
 # /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("Посчитать стоимость", callback_data="start_calc")]]
+    keyboard = [[InlineKeyboardButton("🚗 Приступить", callback_data="start_calc")]]
     await update.message.reply_text(
-        "⚠️ Добро пожаловать в сервис перепрошивки мультимедийных систем FORD.\n\n" \
-        "мы работаем только в городе Минск\n\n"
-        "Чтобы увидеть стоимость услуги, ответьте на несколько вопросов, после чего Вы сможете оставить заявку.",
+        "⚠️ Добро пожаловать в сервис перепрошивки мультимедийных систем FORD.\n\n"
+        "📍 Мы работаем только в городе Минск.\n\n"
+        "Чтобы увидеть стоимость услуги, ответьте на несколько вопросов, после чего вы сможете оставить заявку.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -32,10 +33,58 @@ async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    user_data[user_id] = {"step": "year"}
-    await query.edit_message_text("Введите год выпуска автомобиля (например, 2019):")
+    user_data[user_id] = {"step": "model"}
+    await query.edit_message_text("Укажите модель автомобиля (например, Focus, Kuga):")
 
-# Обработка навигации
+# Обработка текста по шагам
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    text = update.message.text.strip()
+    session = user_data.get(user_id)
+
+    if not session:
+        await update.message.reply_text("Пожалуйста, начните с команды /start.")
+        return
+
+    step = session.get("step")
+
+    if step == "model":
+        if len(text) < 2:
+            await update.message.reply_text("⛔ Введите корректную модель.")
+            return
+        session["model"] = text
+        session["step"] = "year"
+        await update.message.reply_text("✅ Модель принята. Теперь введите год выпуска автомобиля (например, 2019):")
+
+    elif step == "year":
+        if not text.isdigit() or not (2000 <= int(text) <= 2025):
+            await update.message.reply_text("⛔ Введите корректный год от 2000 до 2025.")
+            return
+        session["year"] = text
+        session["step"] = "nav"
+        keyboard = [
+            [InlineKeyboardButton("✅ Есть", callback_data="nav_yes")],
+            [InlineKeyboardButton("❌ Нет", callback_data="nav_no")]
+        ]
+        await update.message.reply_text("Есть ли встроенная навигация?", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif step == "phone":
+        if len(text) < 6:
+            await update.message.reply_text("⛔ Введите корректный номер телефона.")
+            return
+        session["phone"] = text
+        keyboard = [[InlineKeyboardButton("📞 Отправить заявку", callback_data="notify_me")]]
+        msg = (
+            f"📥 Новая заявка:\n"
+            f"• Модель: {session['model']}\n"
+            f"• Год: {session['year']}\n"
+            f"• Навигация: {session['nav']}\n"
+            f"• Цена: {session['price']:.2f} BYN\n"
+            f"• Телефон: {session['phone']}"
+        )
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+# Обработка навигации и расчёт стоимости
 async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -44,11 +93,18 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = user_data.get(user_id, {})
     session["nav"] = nav
     session["step"] = "phone"
-    await query.edit_message_text("✅ Услуга рассчитана.\n💰 Стоимость: 100.00 BYN\n Если хотите оставить заявку\nВведите номер телефона с кодом оператора:")
 
-# Финальный шаг
-from datetime import datetime
+    base_price = 100
+    if nav == "yes":
+        base_price += 20
+    session["price"] = base_price
 
+    await query.edit_message_text(
+        f"✅ Услуга рассчитана.\n💰 Стоимость: {base_price:.2f} BYN\n\n"
+        "Если хотите оставить заявку, введите номер телефона с кодом оператора:"
+    )
+
+# Финальный шаг — отправка заявки
 async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -67,10 +123,11 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"• Username: {username}\n"
             f"• Telegram ID: {user_id}\n"
             f"• Время заявки: {timestamp}\n\n"
-            f"• Год: {session['year']}\n"
             f"• Модель: {session['model']}\n"
+            f"• Год: {session['year']}\n"
             f"• Навигация: {session['nav']}\n"
-            f"• Телефон: {session['phone']}"
+            f"• Телефон: {session['phone']}\n"
+            f"• Цена: {session['price']:.2f} BYN"
         )
 
         await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
@@ -78,54 +135,6 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data.pop(user_id, None)
     else:
         await query.edit_message_text("⛔ Данные не найдены. Начните с /start.")
-# Обработка текста по шагам
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text.strip()
-    session = user_data.get(user_id)
-
-    if not session:
-        await update.message.reply_text("Пожалуйста, начните с команды /start.")
-        return
-
-    step = session.get("step")
-
-    if step == "year":
-        if not text.isdigit() or not (2000 <= int(text) <= 2025):
-            await update.message.reply_text("⛔ Введите корректный год от 2000 до 2025.")
-            return
-        session["year"] = text
-        session["step"] = "model"
-        await update.message.reply_text("✅ Год принят. Укажите модель автомобиля (например, Focus, Kuga):")
-
-    elif step == "model":
-        if len(text) < 2:
-            await update.message.reply_text("⛔ Введите корректную модель.")
-            return
-        session["model"] = text
-        session["step"] = "nav"
-        keyboard = [
-            [InlineKeyboardButton("✅ Есть", callback_data="nav_yes")],
-            [InlineKeyboardButton("❌ Нет", callback_data="nav_no")],
-            [InlineKeyboardButton("❓ Не знаю", callback_data="nav_unknown")]
-        ]
-        await update.message.reply_text("Есть ли встроенная навигация?", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif step == "phone":
-        if len(text) < 6:
-            await update.message.reply_text("⛔ Введите корректный номер телефона.")
-            return
-        session["phone"] = text
-        keyboard = [[InlineKeyboardButton("📞Отправить заявку", callback_data="notify_me")]]
-        msg = (
-            f"📥 Новая заявка:\n"
-            f"• Год: {session['year']}\n"
-            f"• Модель: {session['model']}\n"
-            f"• Навигация: {session['nav']}\n"
-            f"• Цена: 100.00 BYN\n"
-            f"• Телефон: {session['phone']}"
-        )
-        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # Основной запуск
 async def main():
