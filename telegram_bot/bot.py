@@ -7,6 +7,7 @@ from telegram import (
     InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
+    KeyboardButton,
 )
 from telegram.ext import (
     Application,
@@ -102,10 +103,30 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Есть ли встроенная навигация?", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif step == "phone":
-        if len(text) < 6:
-            await update.message.reply_text("⛔ Введите корректный номер телефона.")
+        if not text.startswith("+375") or len(text) < 13:
+            await update.message.reply_text("⛔ Введите номер телефона в формате +375XXXXXXXXX (пример: +375291234567).")
             return
         session["phone"] = text
+        keyboard = [[InlineKeyboardButton("📞 Отправить заявку", callback_data="notify_me")]]
+        msg = (
+            f"📥 Новая заявка:\n"
+            f"• Модель: {session['model']}\n"
+            f"• Год: {session['year']}\n"
+            f"• Навигация: {session['nav']}\n"
+            f"• Цена: {session['price']:.2f} BYN\n"
+            f"• Телефон: {session['phone']}"
+        )
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+# Обработка контакта (если пользователь нажал кнопку "📱 Отправить номер")
+async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    contact = update.message.contact
+    phone_number = contact.phone_number
+    user_id = update.effective_user.id
+    session = user_data.get(user_id)
+
+    if session and session.get("step") == "phone":
+        session["phone"] = phone_number
         keyboard = [[InlineKeyboardButton("📞 Отправить заявку", callback_data="notify_me")]]
         msg = (
             f"📥 Новая заявка:\n"
@@ -132,10 +153,14 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
         base_price += 20
     session["price"] = base_price
 
+    keyboard = [[KeyboardButton("📱 Отправить номер", request_contact=True)]]
+    markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+
     await query.edit_message_text(
         f"✅ Услуга рассчитана.\n💰 Стоимость: {base_price:.2f} BYN\n\n"
-        "Если хотите оставить заявку, введите номер телефона с кодом оператора:"
+        "Пожалуйста, отправьте номер телефона кнопкой ниже или введите вручную в формате +375XXXXXXXXX:",
     )
+    await context.bot.send_message(chat_id=user_id, text="👇 Отправьте номер телефона:", reply_markup=markup)
 
 # Финальный шаг — отправка заявки
 async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -166,7 +191,10 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
 
         restart_keyboard = [[InlineKeyboardButton("🔁 Начать заново", callback_data="start_calc")]]
-        await query.edit_message_text("✅ Спасибо! Ваша заявка принята! Мы свяжемся с вами в ближайшее время.", reply_markup=InlineKeyboardMarkup(restart_keyboard))
+        await query.edit_message_text(
+            "✅ Спасибо! Ваша заявка принята! Мы свяжемся с вами в ближайшее время.",
+            reply_markup=InlineKeyboardMarkup(restart_keyboard)
+        )
         user_data.pop(user_id, None)
     else:
         await query.edit_message_text("⛔ Данные не найдены. Начните с /start.")
@@ -179,6 +207,7 @@ async def main():
     app.add_handler(CallbackQueryHandler(start_calc, pattern="^start_calc$"))
     app.add_handler(CallbackQueryHandler(handle_nav, pattern="^nav_"))
     app.add_handler(CallbackQueryHandler(handle_notify, pattern="^notify_me$"))
+    app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     await app.initialize()
