@@ -34,13 +34,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# Старт опроса
+# Старт опроса — выбор модели
 async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     user_data[user_id] = {"step": "model"}
-    await query.edit_message_text("Укажите модель автомобиля (например, Focus, Kuga):")
+
+    models = [
+        ["EcoSport", "Fusion", "Escape"],
+        ["Bronco Sport", "Edge", "F-150"],
+        ["Mustang", "Другая модель"]
+    ]
+    markup = ReplyKeyboardMarkup(models, one_time_keyboard=True, resize_keyboard=True)
+
+    await query.edit_message_text("Выберите модель автомобиля:")
+    await context.bot.send_message(chat_id=user_id, text="👇 Выберите из списка или нажмите 'Другая модель':", reply_markup=markup)
 
 # Обработка текста по шагам
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -55,9 +64,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = session.get("step")
 
     if step == "model":
+        if text == "Другая модель":
+            await update.message.reply_text("Введите модель вручную (например, Mondeo):", reply_markup=ReplyKeyboardRemove())
+            return
+
         if len(text) < 2:
             await update.message.reply_text("⛔ Введите корректную модель.")
             return
+
         session["model"] = text
         session["step"] = "year"
 
@@ -66,7 +80,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append(["Другой год"])
         markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
-        await update.message.reply_text("Выберите год выпуска автомобиля:", reply_markup=markup)
+        await update.message.reply_text("✅ Модель принята.\nТеперь выберите год выпуска автомобиля:", reply_markup=markup)
 
     elif step == "year":
         if text == "Другой год":
@@ -150,7 +164,9 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
-        await query.edit_message_text("✅ Спасибо! Ваша заявка принята! Мы свяжемся с вами в ближайшее время.")
+
+        restart_keyboard = [[InlineKeyboardButton("🔁 Начать заново", callback_data="start_calc")]]
+        await query.edit_message_text("✅ Спасибо! Ваша заявка принята! Мы свяжемся с вами в ближайшее время.", reply_markup=InlineKeyboardMarkup(restart_keyboard))
         user_data.pop(user_id, None)
     else:
         await query.edit_message_text("⛔ Данные не найдены. Начните с /start.")
