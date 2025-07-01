@@ -1,7 +1,13 @@
 import os
 import asyncio
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -54,14 +60,27 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         session["model"] = text
         session["step"] = "year"
-        await update.message.reply_text("✅ Модель принята. Теперь введите год выпуска автомобиля (например, 2019):")
+
+        years = [str(y) for y in range(2025, 2014, -1)]
+        keyboard = [years[i:i+3] for i in range(0, len(years), 3)]
+        keyboard.append(["Другой год"])
+        markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+
+        await update.message.reply_text("Выберите год выпуска автомобиля:", reply_markup=markup)
 
     elif step == "year":
+        if text == "Другой год":
+            await update.message.reply_text("Введите год вручную (например, 2012):", reply_markup=ReplyKeyboardRemove())
+            return
+
         if not text.isdigit() or not (2000 <= int(text) <= 2025):
             await update.message.reply_text("⛔ Введите корректный год от 2000 до 2025.")
             return
+
         session["year"] = text
         session["step"] = "nav"
+        await update.message.reply_text("✅ Год принят.", reply_markup=ReplyKeyboardRemove())
+
         keyboard = [
             [InlineKeyboardButton("✅ Есть", callback_data="nav_yes")],
             [InlineKeyboardButton("❌ Нет", callback_data="nav_no")]
