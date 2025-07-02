@@ -33,17 +33,40 @@ sheet = client.open("Заявки FORD").sheet1
 
 user_data = {}
 
-# /start
+# /start функция
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("🚗 Приступить", callback_data="start_calc")]]
+    keyboard = [
+        [InlineKeyboardButton("🚗 Приступить", callback_data="start_calc")],
+        [InlineKeyboardButton("ℹ️ Подробнее об услуге", callback_data="show_info")]
+    ]
     await update.message.reply_text(
-        "⚠️ Добро пожаловать в сервис перепрошивки мультимедийных систем FORD.\n\n"
-        "📍 Мы работаем только в городе Минск.\n\n"
-        "Чтобы увидеть стоимость услуги, ответьте на несколько вопросов, после чего вы сможете оставить заявку.",
+        "⚠️ Здравствуйте! Мы занимаемся перепрошивкой мультимедийных систем Ford, Lincoln. Sync 2,3,4\n\n"
+        "📍 Мы работаем только в городе Минск\n\n"
+        "📍 Мы работаем официально (УНП: АС2017923) \n\n"
+        "Чтобы увидеть стоимость услуги, нажмите 'Приступить' и укажите несколько параметров автомобиля\n\n"
+        "Сначала вы видите стоимость, а потом оставляете заявку. Мы не собираем ваши данные и не передаем третьим лицам\n\n"
+        "⚠️ Внимание! на обработку потребуется около 1-2 минут, пожалуйста, подождите...\n\n",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# Старт опроса
+# Под кнопкой Подробнее об услуге
+
+async def show_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    keyboard = [[InlineKeyboardButton("⬅️ Вернуться назад", callback_data="go_back")]]
+    await query.edit_message_text(
+        "ℹ️ Мы работаем с Мультимедийными системами Ford Sync2, Sync3, Sync4\n\n"
+        "ℹ️ Мы руссифицируем мультимедийный экран, экран приборной панели, а так же голосовой ввод\n\n"        
+        "ℹ️ Мы используем только официальные чипы и прошивки Ford\n\n"
+        "ℹ️ Мы работаем с выездом по г.Минску, без выходных.\n\n"
+        "ℹ️ Процедура занимает 30-60 минут.\n\n"
+        "ℹ️ Мы работаем официально, услугу можно оплатить наличным или безналичным расчетом\n\n"
+        "📞 Если у вас остались вопросы — просто нажмите «Приступить» и оставьте заявку.",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# Под кнопкой Приступить
 async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -106,7 +129,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         session["phone"] = text
         session["reached_price"] = False
-        keyboard = [[InlineKeyboardButton("📞 Отправить заявку", callback_data="notify_me")]]
+        keyboard = [[InlineKeyboardButton("📞 Подтвердить заявку и отправить", callback_data="notify_me")]]
         msg = (
             f"📥 Новая заявка:\n"
             f"• Модель: {session['model']}\n"
@@ -126,7 +149,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if session and session.get("step") == "phone":
         session["phone"] = phone_number
         session["reached_price"] = False
-        keyboard = [[InlineKeyboardButton("📞 Отправить заявку", callback_data="notify_me")]]
+        keyboard = [[InlineKeyboardButton("📞 Подтвердить заявку и отправить", callback_data="notify_me")]]
         msg = (
             f"📥 Новая заявка:\n"
             f"• Модель: {session['model']}\n"
@@ -146,9 +169,9 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = user_data.get(user_id, {})
     session["nav"] = nav
     session["step"] = "phone"
-    base_price = 100
+    base_price = 80
     if nav == "yes":
-        base_price += 20
+        base_price += 40
     session["price"] = base_price
     session["reached_price"] = True
     session["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -173,8 +196,8 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[KeyboardButton("📱 Отправить номер", request_contact=True)]]
     markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
     await query.edit_message_text(
-        f"✅ Услуга рассчитана.\n💰 Стоимость: {base_price:.2f} BYN\n\n"
-        "Пожалуйста, отправьте номер телефона кнопкой ниже или введите вручную в формате +375XXXXXXXXX:"
+        f"✅ Стоимость услуги рассчитана.\n💰 Стоимость: {base_price:.2f} BYN\n\n"
+        "Пожалуйста, отправьте номер телефона кнопкой ниже или введите вручную в формате +375XXXXXXXXX чтобы завершить отправку заявки"
     )
     await context.bot.send_message(chat_id=user_id, text="👇 Отправьте номер телефона:", reply_markup=markup)
 
