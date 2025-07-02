@@ -66,6 +66,19 @@ async def show_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+async def go_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    keyboard = [
+        [InlineKeyboardButton("🚗 Приступить", callback_data="start_calc")],
+        [InlineKeyboardButton("ℹ️ Подробнее об услуге", callback_data="show_info")]
+    ]
+    await query.edit_message_text(
+        "⚠️ Добро пожаловать обратно!\n\n"
+        "Выберите, с чего хотите начать:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 # Под кнопкой Приступить
 async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -263,6 +276,8 @@ async def main():
     app.add_handler(CallbackQueryHandler(handle_notify, pattern="^notify_me$"))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(CallbackQueryHandler(show_info, pattern="^show_info$"))
+    app.add_handler(CallbackQueryHandler(go_back, pattern="^go_back$"))
 
     await app.initialize()
     await app.start()
