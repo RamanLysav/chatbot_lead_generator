@@ -1,6 +1,8 @@
 import os
 import asyncio
 from datetime import datetime
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -18,12 +20,20 @@ from telegram.ext import (
     filters,
 )
 
+# Конфигурация
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
 WEBHOOK_URL = "https://chatbot-lead-generator.onrender.com"
 
+# Google Sheets
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/credentials.json", scope)
+client = gspread.authorize(creds)
+sheet = client.open("Заявки FORD").sheet1
+
 user_data = {}
 
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🚗 Приступить", callback_data="start_calc")]]
     await update.message.reply_text(
@@ -33,6 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+# Старт опроса
 async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -49,6 +60,7 @@ async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text("Выберите модель автомобиля:")
     await context.bot.send_message(chat_id=user_id, text="👇 Выберите из списка или нажмите 'Другая модель':", reply_markup=markup)
 
+# Обработка текста
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
@@ -105,6 +117,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
+# Обработка контакта
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     phone_number = contact.phone_number
@@ -124,6 +137,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
+# Обработка навигации
 async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -164,17 +178,21 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await context.bot.send_message(chat_id=user_id, text="👇 Отправьте номер телефона:", reply_markup=markup)
 
+# Отправка заявки и экспорт в таблицу
 async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     user = query.from_user
     session = user_data.get(user_id)
+
     if session:
         session["reached_price"] = False
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         first_name = user.first_name or "—"
         username = f"@{user.username}" if user.username else "—"
+
+        # Сообщение админу
         msg = (
             f"📬 Заявка от пользователя:\n"
             f"• Имя: {first_name}\n"
@@ -187,9 +205,22 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"• Телефон: {session['phone']}\n"
             f"• Цена: {session['price']:.2f} BYN"
         )
-
         await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
 
+        # Экспорт в Google Таблицу
+        sheet.append_row([
+            timestamp,
+            first_name,
+            username,
+            str(user_id),
+            session["model"],
+            session["year"],
+            session["nav"],
+            session["phone"],
+            f"{session['price']:.2f}"
+        ])
+
+        # Ответ пользователю
         restart_keyboard = [[InlineKeyboardButton("🔁 Начать заново", callback_data="start_calc")]]
         await query.edit_message_text(
             "✅ Спасибо! Ваша заявка принята! Мы свяжемся с вами в ближайшее время.",
