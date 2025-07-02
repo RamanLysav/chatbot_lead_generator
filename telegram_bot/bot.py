@@ -18,14 +18,12 @@ from telegram.ext import (
     filters,
 )
 
-# Конфигурация
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
 WEBHOOK_URL = "https://chatbot-lead-generator.onrender.com"
 
 user_data = {}
 
-# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🚗 Приступить", callback_data="start_calc")]]
     await update.message.reply_text(
@@ -35,7 +33,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# Старт опроса — выбор модели
 async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -52,7 +49,6 @@ async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text("Выберите модель автомобиля:")
     await context.bot.send_message(chat_id=user_id, text="👇 Выберите из списка или нажмите 'Другая модель':", reply_markup=markup)
 
-# Обработка текста по шагам
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
@@ -68,34 +64,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text == "Другая модель":
             await update.message.reply_text("Введите модель вручную (например, Mondeo):", reply_markup=ReplyKeyboardRemove())
             return
-
-        if len(text) < 2:
-            await update.message.reply_text("⛔ Введите корректную модель.")
-            return
-
         session["model"] = text
         session["step"] = "year"
-
         years = [str(y) for y in range(2025, 2014, -1)]
         keyboard = [years[i:i+3] for i in range(0, len(years), 3)]
         keyboard.append(["Другой год"])
         markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
-
         await update.message.reply_text("✅ Модель принята.\nТеперь выберите год выпуска автомобиля:", reply_markup=markup)
 
     elif step == "year":
         if text == "Другой год":
             await update.message.reply_text("Введите год вручную (например, 2012):", reply_markup=ReplyKeyboardRemove())
             return
-
         if not text.isdigit() or not (2000 <= int(text) <= 2025):
             await update.message.reply_text("⛔ Введите корректный год от 2000 до 2025.")
             return
-
         session["year"] = text
         session["step"] = "nav"
         await update.message.reply_text("✅ Год принят.", reply_markup=ReplyKeyboardRemove())
-
         keyboard = [
             [InlineKeyboardButton("✅ Есть", callback_data="nav_yes")],
             [InlineKeyboardButton("❌ Нет", callback_data="nav_no")]
@@ -107,6 +93,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⛔ Введите номер телефона в формате +375XXXXXXXXX (пример: +375291234567).")
             return
         session["phone"] = text
+        session["reached_price"] = False
         keyboard = [[InlineKeyboardButton("📞 Отправить заявку", callback_data="notify_me")]]
         msg = (
             f"📥 Новая заявка:\n"
@@ -118,15 +105,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
-# Обработка контакта (если пользователь нажал кнопку "📱 Отправить номер")
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     phone_number = contact.phone_number
     user_id = update.effective_user.id
     session = user_data.get(user_id)
-
     if session and session.get("step") == "phone":
         session["phone"] = phone_number
+        session["reached_price"] = False
         keyboard = [[InlineKeyboardButton("📞 Отправить заявку", callback_data="notify_me")]]
         msg = (
             f"📥 Новая заявка:\n"
@@ -138,7 +124,6 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
-# Обработка навигации и расчёт стоимости
 async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -147,34 +132,49 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = user_data.get(user_id, {})
     session["nav"] = nav
     session["step"] = "phone"
-
     base_price = 100
     if nav == "yes":
         base_price += 20
     session["price"] = base_price
+    session["reached_price"] = True
+    session["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    async def check_abandoned(user_id, context):
+        await asyncio.sleep(300)
+        session = user_data.get(user_id)
+        if session and session.get("reached_price") and session.get("step") == "phone":
+            msg = (
+                f"⚠️ Пользователь не завершил заявку:\n"
+                f"• Модель: {session['model']}\n"
+                f"• Год: {session['year']}\n"
+                f"• Навигация: {session['nav']}\n"
+                f"• Цена: {session['price']:.2f} BYN\n"
+                f"• Время: {session['timestamp']}\n"
+                f"• Telegram ID: {user_id}"
+            )
+            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
+
+    context.application.create_task(check_abandoned(user_id, context))
 
     keyboard = [[KeyboardButton("📱 Отправить номер", request_contact=True)]]
     markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
-
     await query.edit_message_text(
         f"✅ Услуга рассчитана.\n💰 Стоимость: {base_price:.2f} BYN\n\n"
-        "Пожалуйста, отправьте номер телефона кнопкой ниже или введите вручную в формате +375XXXXXXXXX:",
+        "Пожалуйста, отправьте номер телефона кнопкой ниже или введите вручную в формате +375XXXXXXXXX:"
     )
     await context.bot.send_message(chat_id=user_id, text="👇 Отправьте номер телефона:", reply_markup=markup)
 
-# Финальный шаг — отправка заявки
 async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     user = query.from_user
     session = user_data.get(user_id)
-
     if session:
+        session["reached_price"] = False
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         first_name = user.first_name or "—"
         username = f"@{user.username}" if user.username else "—"
-
         msg = (
             f"📬 Заявка от пользователя:\n"
             f"• Имя: {first_name}\n"
