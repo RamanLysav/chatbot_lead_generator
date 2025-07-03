@@ -266,6 +266,22 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await query.edit_message_text("⛔ Данные не найдены. Начните с /start.")
 
+
+# Версия из Git
+
+import subprocess
+
+def get_git_commit_message():
+    try:
+        result = subprocess.check_output(["git", "log", "-1", "--pretty=%s"])
+        return result.decode("utf-8").strip()
+    except Exception:
+        return "не удалось получить версию"
+    
+async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    commit_msg = get_git_commit_message()
+    await update.message.reply_text(f"🤖 Версия бота: `{commit_msg}`", parse_mode="Markdown")
+
 # Основной запуск
 async def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -278,6 +294,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(show_info, pattern="^show_info$"))
     app.add_handler(CallbackQueryHandler(go_back, pattern="^go_back$"))
+    app.add_handler(CommandHandler("about", about))
 
     await app.initialize()
     await app.start()
