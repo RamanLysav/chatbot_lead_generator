@@ -125,8 +125,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text == "Другой год":
             await update.message.reply_text("Введите год вручную (например, 2012):", reply_markup=ReplyKeyboardRemove())
             return
-        if not text.isdigit() or not (2000 <= int(text) <= 2025):
-            await update.message.reply_text("⛔ Введите корректный год от 2000 до 2025.")
+        if not text.isdigit() or not (2010 <= int(text) <= 2025):
+            await update.message.reply_text("⛔ Введите корректный год от 2010 до 2025.")
             return
         session["year"] = text
         session["step"] = "nav"
