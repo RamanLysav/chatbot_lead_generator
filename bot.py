@@ -183,9 +183,9 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = user_data.get(user_id, {})
     session["nav"] = nav
     session["step"] = "phone"
-    base_price = 80
+    base_price = 100
     if nav == "yes":
-        base_price += 40
+        base_price += 30
     session["price"] = base_price
     session["reached_price"] = True
     session["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
