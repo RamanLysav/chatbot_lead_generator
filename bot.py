@@ -189,6 +189,8 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session["price"] = base_price
     session["reached_price"] = True
     session["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    session["first_name"] = update.effective_user.first_name or "—"
+    session["username"] = f"@{update.effective_user.username}" if update.effective_user.username else "—"
 
     async def check_abandoned(user_id, context):
         await asyncio.sleep(300)
@@ -196,13 +198,16 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if session and session.get("reached_price") and session.get("step") == "phone":
             msg = (
                 f"⚠️ Пользователь не завершил заявку:\n"
+                f"• Имя: {session.get('first_name', '—')}\n"
+                f"• Username: {session.get('username', '—')}\n"
+                f"• Telegram ID: {user_id}\n"
                 f"• Модель: {session['model']}\n"
                 f"• Год: {session['year']}\n"
                 f"• Навигация: {session['nav']}\n"
                 f"• Цена: {session['price']:.2f} BYN\n"
-                f"• Время: {session['timestamp']}\n"
-                f"• Telegram ID: {user_id}"
+                f"• Время: {session['timestamp']}"
             )
+
             await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
 
     context.application.create_task(check_abandoned(user_id, context))
