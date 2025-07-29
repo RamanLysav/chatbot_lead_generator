@@ -11,16 +11,17 @@ from handlers import start, brand, model, flow
 from handlers.states import BRAND, MODEL, YEAR, NAV, PHONE, DONE
 from config import BOT_TOKEN
 
-
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     # Conversation flow
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start.start)],
+        entry_points=[
+            CommandHandler("start", start.start),
+            CallbackQueryHandler(start.start_calc, pattern="^start_calc$")  # 👈 перенесли сюда!
+        ],
         states={
             BRAND: [
-                CallbackQueryHandler(start.start_calc, pattern="^start_calc$"),
                 CallbackQueryHandler(brand.choose_brand, pattern="^brand_")
             ],
             MODEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, model.text_handler)],
@@ -37,7 +38,6 @@ def main():
 
     print("Бот запущен ✅")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
