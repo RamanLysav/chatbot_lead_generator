@@ -6,7 +6,7 @@ import gspread
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "123456789"))
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-PORT = 8443
+PORT = int(os.getenv("PORT", 8443)) 
 # Google Sheets
 SHEET_NAME = os.getenv("SHEET_NAME", "Заявки FORD")
 CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_JSON", "/etc/secrets/credentials.json")
