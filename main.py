@@ -9,16 +9,15 @@ from telegram.ext import (
 
 from handlers import start, brand, model, flow
 from handlers.states import BRAND, MODEL, YEAR, NAV, PHONE, DONE
-from config import BOT_TOKEN
+from config import BOT_TOKEN, WEBHOOK_URL, PORT
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Conversation flow
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start.start),
-            CallbackQueryHandler(start.start_calc, pattern="^start_calc$")  # 👈 перенесли сюда!
+            CallbackQueryHandler(start.start_calc, pattern="^start_calc$")
         ],
         states={
             BRAND: [
@@ -36,8 +35,13 @@ def main():
 
     app.add_handler(conv_handler)
 
-    print("Бот запущен ✅")
-    app.run_polling()
+    # Установка webhook
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL,
+        allowed_updates=telegram.constants.UpdateType.ALL_TYPES
+    )
 
 if __name__ == "__main__":
     main()
