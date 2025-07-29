@@ -13,3 +13,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Добро пожаловать! 🚀", reply_markup=markup)
     else:
         print("⛔️ Неизвестный тип update:", update)
+
+
+async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    # Здесь можно использовать любую структуру для отслеживания состояния
+    keyboard = [
+        [InlineKeyboardButton("Ford", callback_data="brand_ford")],
+        [InlineKeyboardButton("Lincoln", callback_data="brand_lincoln")]
+    ]
+    await query.edit_message_text("Выберите марку автомобиля:", reply_markup=InlineKeyboardMarkup(keyboard))
