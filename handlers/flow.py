@@ -120,3 +120,26 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=markup,
         )
         return
+
+async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    phone = update.message.contact.phone_number
+    session = user_data.get(user_id)
+
+    if not session or session.get("step") != "phone":
+        await update.message.reply_text("⛔ Неожиданный контакт. Начните с /start.")
+        return
+
+    session["phone"] = phone
+    session["step"] = "confirm"
+
+    confirm_buttons = [
+        [InlineKeyboardButton("✅ Отправить заявку", callback_data="notify_me")],
+        [InlineKeyboardButton("🔄 Начать заново", callback_data="start_calc")],
+    ]
+    markup = InlineKeyboardMarkup(confirm_buttons)
+
+    await update.message.reply_text(
+        f"📞 Ваш номер: {phone}\n\nНажмите «Отправить заявку», чтобы подтвердить.",
+        reply_markup=markup,
+    )
