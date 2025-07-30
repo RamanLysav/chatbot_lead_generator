@@ -1,47 +1,44 @@
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
-from handlers.states import NAV, PHONE, DONE
-from utils.data import user_data
-from utils.sheets import append_row_to_sheet
+from data.session import user_data
 
-async def year_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
+async def start_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    user_data[user_id] = {"step": "model"}
+
+    models = [["EcoSport", "Fusion", "Escape"], ["Bronco Sport", "Edge", "F-150"], ["Mustang", "Другая модель"]]
+    markup = ReplyKeyboardMarkup(models, one_time_keyboard=True, resize_keyboard=True)
+
+    await query.edit_message_text("Выберите модель автомобиля:")
+    await context.bot.send_message(chat_id=user_id, text="👇 Выберите из списка или нажмите 'Другая модель':", reply_markup=markup)
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     text = update.message.text.strip()
+    session = user_data.get(user_id)
 
-    try:
-        year = int(text)
-        user_data[user_id]["year"] = year
-        markup = ReplyKeyboardMarkup([["С навигацией", "Без навигации"]],
-                                     one_time_keyboard=True, resize_keyboard=True)
-        await update.message.reply_text("Есть ли навигация?", reply_markup=markup)
-        return NAV
-    except ValueError:
-        await update.message.reply_text("Введите год цифрами, например: 2017")
-        return YEAR
+    if not session:
+        await update.message.reply_text("Пожалуйста, начните с команды /start.")
+        return
 
-async def nav_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    user_data[user_id]["nav"] = update.message.text.strip()
-    await update.message.reply_text("Введите номер телефона:", reply_markup=ReplyKeyboardRemove())
-    return PHONE
+    step = session.get("step")
 
-async def phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    user_data[user_id]["phone"] = update.message.text.strip()
+    if step == "model":
+        if text == "Другая модель":
+            await update.message.reply_text("Введите модель вручную:", reply_markup=ReplyKeyboardRemove())
+            return
+        session["model"] = text
+        session["step"] = "year"
+        years = [str(y) for y in range(2025, 2014, -1)]
+        keyboard = [years[i:i+3] for i in range(0, len(years), 3)] + [["Другой год"]]
+        markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+        await update.message.reply_text("✅ Модель принята.\nТеперь выберите год:", reply_markup=markup)
 
-    info = user_data[user_id]
-    row = [info.get("brand"), info.get("model"), info.get("year"), info.get("nav"), info.get("phone")]
-    append_row_to_sheet(row)
-
-    summary = (
-        f"📋 Ваша заявка:\n"
-        f"Марка: {info.get('brand')}\n"
-        f"Модель: {info.get('model')}\n"
-        f"Год: {info.get('year')}\n"
-        f"Навигация: {info.get('nav')}\n"
-        f"Телефон: {info.get('phone')}"
-    )
-
-    await update.message.reply_text(summary)
-    await update.message.reply_text("✅ Спасибо! Ваша заявка отправлена.")
-    return DONE
+    elif step == "year":
+        if text == "Другой год":
+            await update.message.reply_text("Введите год вручную:", reply_markup=ReplyKeyboardRemove())
+            return
+        if not text.isdigit() or not (2010 <= int(text) <= 2025):
+            await update.message.reply_text("⛔ Введите
