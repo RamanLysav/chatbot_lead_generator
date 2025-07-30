@@ -21,16 +21,18 @@ from telegram.ext import (
 )
 
 # Конфигурация
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
+#BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
+#ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
 #WEBHOOK_URL = "https://chatbot-lead-generator.onrender.com"
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+#WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 # Google Sheets
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/credentials.json", scope)
-client = gspread.authorize(creds)
-sheet = client.open("Заявки FORD").sheet1
+#scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+#creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/credentials.json", scope)
+#client = gspread.authorize(creds)
+#sheet = client.open("Заявки FORD").sheet1
+from config import BOT_TOKEN, ADMIN_CHAT_ID, WEBHOOK_URL
+from config import SHEET, SCOPE, CREDS, CLIENT
 
 user_data = {}
 
