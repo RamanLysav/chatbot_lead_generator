@@ -32,7 +32,7 @@ from telegram.ext import (
 #client = gspread.authorize(creds)
 #sheet = client.open("Заявки FORD").sheet1
 from config import BOT_TOKEN, ADMIN_CHAT_ID, WEBHOOK_URL
-from config import SHEET, SCOPE, CREDS, CLIENT
+from config import SHEET
 
 user_data = {}
 
