@@ -20,16 +20,6 @@ from telegram.ext import (
     filters,
 )
 
-# Конфигурация
-#BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
-#ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
-#WEBHOOK_URL = "https://chatbot-lead-generator.onrender.com"
-#WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-# Google Sheets
-#scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-#creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/credentials.json", scope)
-#client = gspread.authorize(creds)
-#sheet = client.open("Заявки FORD").sheet1
 from config import BOT_TOKEN, ADMIN_CHAT_ID, WEBHOOK_URL
 from config import SHEET
 
@@ -56,16 +46,23 @@ async def show_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     keyboard = [[InlineKeyboardButton("⬅️ Вернуться назад", callback_data="go_back")]]
+    #await query.edit_message_text(
+    #    "ℹ️ Мы работаем с Мультимедийными системами Ford, Lincoln\n\n"
+    #    "ℹ️ Мы руссифицируем мультимедийный экран, экран приборной панели, а так же голосовой ввод\n\n"        
+    #    "ℹ️ Мы используем только официальные чипы и прошивки Ford\n\n"
+    #    "ℹ️ Мы работаем с выездом по г.Минску, без выходных.\n\n"
+    #    "ℹ️ Процедура занимает 30-180 минут.\n\n"
+    #    "ℹ️ Мы работаем официально, услугу можно оплатить наличным или безналичным расчетом\n\n"
+    #    "📞 Если у вас остались вопросы — просто нажмите «Приступить» и оставьте заявку.",
+    #    reply_markup=InlineKeyboardMarkup(keyboard)
+    #)
+    from texts import INFO_TEXT
+
     await query.edit_message_text(
-        "ℹ️ Мы работаем с Мультимедийными системами Ford, Lincoln\n\n"
-        "ℹ️ Мы руссифицируем мультимедийный экран, экран приборной панели, а так же голосовой ввод\n\n"        
-        "ℹ️ Мы используем только официальные чипы и прошивки Ford\n\n"
-        "ℹ️ Мы работаем с выездом по г.Минску, без выходных.\n\n"
-        "ℹ️ Процедура занимает 30-180 минут.\n\n"
-        "ℹ️ Мы работаем официально, услугу можно оплатить наличным или безналичным расчетом\n\n"
-        "📞 Если у вас остались вопросы — просто нажмите «Приступить» и оставьте заявку.",
+        INFO_TEXT,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
 
 async def go_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -123,10 +120,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif step == "year":
         if text == "Другой год":
-            await update.message.reply_text("Введите год вручную (например, 2012):", reply_markup=ReplyKeyboardRemove())
+            await update.message.reply_text("Введите год вручную (например, 2018):", reply_markup=ReplyKeyboardRemove())
             return
-        if not text.isdigit() or not (2010 <= int(text) <= 2025):
-            await update.message.reply_text("⛔ Введите корректный год от 2010 до 2025.")
+        if not text.isdigit() or not (2015 <= int(text) <= 2025):
+            await update.message.reply_text("⛔ Введите корректный год от 2015 до 2025.")
             return
         session["year"] = text
         session["step"] = "nav"
@@ -273,26 +270,13 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("⛔ Данные не найдены. Начните с /start.")
 
 
-# Версия из Git
+# Версия из Git /about
 
 from version import get_git_commit_message
 
 async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     commit_msg = get_git_commit_message()
     await update.message.reply_text(f"🤖 Версия бота: `{commit_msg}`", parse_mode="Markdown")
-
-#import subprocess
-
-#def get_git_commit_message():
-#    try:
-#        result = subprocess.check_output(["git", "log", "-1", "--pretty=%s"])
-#        return result.decode("utf-8").strip()
-#    except Exception:
-#        return "не удалось получить версию"
-    
-#async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#    commit_msg = get_git_commit_message()
-#    await update.message.reply_text(f"🤖 Версия бота: `{commit_msg}`", parse_mode="Markdown")
 
 # Основной запуск
 async def main():
