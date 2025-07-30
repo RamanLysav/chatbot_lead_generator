@@ -251,7 +251,7 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg)
 
         # Экспорт в Google Таблицу
-        sheet.append_row([
+        SHEET.append_row([
             timestamp,
             first_name,
             username,
