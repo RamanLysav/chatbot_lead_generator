@@ -25,7 +25,6 @@ from telegram.ext import (
 #ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 123456789)
 #WEBHOOK_URL = "https://chatbot-lead-generator.onrender.com"
 #WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-
 # Google Sheets
 #scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 #creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/credentials.json", scope)
@@ -186,7 +185,7 @@ async def handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session["step"] = "phone"
     base_price = 100
     if nav == "yes":
-        base_price += 30
+        base_price += 40
     session["price"] = base_price
     session["reached_price"] = True
     session["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -276,18 +275,24 @@ async def handle_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Версия из Git
 
-import subprocess
+from version import get_git_commit_message
 
-def get_git_commit_message():
-    try:
-        result = subprocess.check_output(["git", "log", "-1", "--pretty=%s"])
-        return result.decode("utf-8").strip()
-    except Exception:
-        return "не удалось получить версию"
-    
 async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     commit_msg = get_git_commit_message()
     await update.message.reply_text(f"🤖 Версия бота: `{commit_msg}`", parse_mode="Markdown")
+
+#import subprocess
+
+#def get_git_commit_message():
+#    try:
+#        result = subprocess.check_output(["git", "log", "-1", "--pretty=%s"])
+#        return result.decode("utf-8").strip()
+#    except Exception:
+#        return "не удалось получить версию"
+    
+#async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#    commit_msg = get_git_commit_message()
+#    await update.message.reply_text(f"🤖 Версия бота: `{commit_msg}`", parse_mode="Markdown")
 
 # Основной запуск
 async def main():
